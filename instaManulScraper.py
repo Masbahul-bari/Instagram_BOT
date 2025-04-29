@@ -56,38 +56,53 @@ def load_post_link(driver, post_links):
         time.sleep(5)
 
         source = source_name(driver)
-        url_screenshot = post_screenshot(driver, post_link)
+
+        trimmed_post_link = post_link.replace("https://www.instagram.com", "")
+        new_post_link = f"https://www.instagram.com/{source}{trimmed_post_link}"
+        driver.execute_script(f"window.location.href = '{new_post_link}'")
+
+        url_screenshot = post_screenshot(driver, new_post_link)
         description_text = description(driver)
         posted_at = get_post_time(driver)
         like_count = like(driver)
-        comments = comment(driver)
+        comments = comment(driver,new_post_link)
         number_of_comments = num_of_comment(comments)
         current_time = scrap_at()
-        # source = source_name(driver)
 
         post_data = create_post_data(
             source, url_screenshot, post_link, description_text, posted_at, comments, like_count, number_of_comments, current_time
         )
 
         save_post_data(post_data, post_link)
+        input()
 
 def post_screenshot(driver, post_link):
-    parsed_url = urlparse(post_link)
-    relative_path = parsed_url.path
+    # driver.get_screenshot_as_file(f"/home/mesba/Documents/new/ss/{post_link}.png")
+    image_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "(//div[@class='_aagu _aato']//img[@class='x5yr21d xu96u03 x10l6tqk x13vifvy x87ps6o xh8yej3'])[1]")))
+    post_media_url = image_element.get_attribute("src")
+    return post_media_url
+    # print("post link: ",post_link)
+    # parsed_url = urlparse(post_link)
+    # relative_path = parsed_url.path
+    # print("media link: ",relative_path)
     
-    try:
-        image_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, f"//a[@href='{relative_path}']//img[@crossorigin='anonymous' and @style='object-fit: cover;']")))
-        post_media_url = image_element.get_attribute("src")
-        media_link = post_media_url
-
-        return media_link
-    except:
-        media_link = None
-        return media_link
+    # try:
+    #     print("1")
+    #     image_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, f"//a[@href='{relative_path}']//img[@crossorigin='anonymous' and @style='object-fit: cover;']")))
+    #     print("2")
+    #     post_media_url = image_element.get_attribute("src")
+    #     print("3")
+    #     media_links = post_media_url
+    #     print(media_links)
+    #     return media_links
+    # except:
+    #     media_links = None
+    #     print(media_links)
+    #     return media_links
 
 def description(driver):
     try:
-        description_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//div[@class='xt0psk2']/h1[@class='_ap3a _aaco _aacu _aacx _aad7 _aade']")))
+        description_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "//div[@class='x5yr21d xw2csxc x1odjw0f x1n2onr6']//span[@class='x193iq5w xeuugli x1fj9vlw x13faqbe x1vvkbs xt0psk2 x1i0vuye xvs91rp xo1l8bm x5n08af x10wh9bi x1wdrske x8viiok x18hxmgj']")))
         description = description_element.text
         return description
     except:
@@ -116,23 +131,26 @@ def like(driver):
         like_count = None
         return like_count
 
-def comment(driver):
+def comment(driver, new_post_link):
     comments = []
+    # driver.execute_script(f"window.location.href = '{new_post_link}'")
+    driver.implicitly_wait(2)
     while True:
         try:
             view_more_button = WebDriverWait(driver, 2).until(
                 EC.element_to_be_clickable((By.XPATH, "//div[@style='min-height: 40px;']//button[@class='_abl-']//div[@class='_abm0']"))
             )
             driver.execute_script("arguments[0].click();", view_more_button)
-            time.sleep(2)
+            time.sleep(2)  # Wait for comments to load
         except:
-            break  
+            break  # No more "View more comments" button
 
+    # Locate all top-level comments
     time.sleep(3)
     comment_elements = driver.find_elements(By.XPATH, "//ul[@class='_a9ym']/div/li")
-
     for comment_element in comment_elements:
         try:
+            # Extract comment details
             user_profile_picture = comment_element.find_element(By.XPATH, ".//img[@crossorigin='anonymous']").get_attribute("src")
             user_name = comment_element.find_element(By.XPATH, ".//span[@class='xt0psk2']//a[@role='link']").text
             user_profile_url = f"https://www.instagram.com/{user_name}/"
@@ -141,25 +159,29 @@ def comment(driver):
             formatted_date = datetime.strptime(comment_time, "%Y-%m-%dT%H:%M:%S.%fZ") 
             comment_time = formatted_date.strftime("%Y-%m-%d %H:%M:%S")
 
+            # Extract replies for this comment
             comments_replies = []
-            # print(f"Scraping comment for {user_name}: {comment_text}")
+            print(f"Scraping comment for {user_name}: {comment_text}")
 
             try:
                 # **Find the "View Replies" button inside this comment only**
-                reply_button = comment_element.find_element(By.XPATH, "//ul[@class='_a9ym']/li//ul[@class='_a9yo']//button[contains(., 'View replies')]")
+                reply_button = comment_element.find_element(By.XPATH, ".//ul[@class='_a9yo']//button[contains(., 'View replies')]")
                 driver.execute_script("arguments[0].click();", reply_button)
                 print(f"Clicked 'View Replies' for {user_name}")
 
+                # **Wait for replies to load**
                 WebDriverWait(driver, 5).until(
                     EC.presence_of_element_located((By.XPATH, "//ul[@class='_a9yo']/div[@role='button']"))
                 )
                 time.sleep(2)  
 
+
                 # click_reply = driver.find_element(By.XPATH, "//ul[@class='_a9ym']/li//ul[@class='_a9yo']//button[contains(., 'View replies')]")
                 # click_reply.click()
                 # time.sleep(5)  # Just to ensure replies are fully visible
 
-                reply_elements = comment_element.find_elements(By.XPATH, "//ul[@class='_a9yo']/div[@role='button']")
+                # **Now scrape the replies**
+                reply_elements = comment_element.find_elements(By.XPATH, ".//ul[@class='_a9yo']/div[@role='button']")
                 print(len(reply_elements))
                 for reply_element in reply_elements:
                     try:
@@ -168,8 +190,8 @@ def comment(driver):
                         reply_user_profile_url = f"https://www.instagram.com/{reply_user_name}/"
                         reply_comment_text = reply_element.find_element(By.XPATH, ".//div[@class='xt0psk2']").text
                         reply_comment_time = reply_element.find_element(By.XPATH, ".//time").get_attribute("datetime")
-        
-                        formatted_date = datetime.strptime(reply_comment_time, "%Y-%m-%dT%H:%M:%S.%fZ")
+                        # Format the timestamp if needed
+                        formatted_date = datetime.strptime(reply_comment_time, "%Y-%m-%dT%H:%M:%S.%fZ")  # Adjust format if necessary
                         reply_comment_time = formatted_date.strftime("%Y-%m-%d %H:%M:%S")
 
                         comments_replies.append({
@@ -180,7 +202,7 @@ def comment(driver):
                             "comment_text": reply_comment_text
                         })
                     except:
-                        continue 
+                        continue  # Skip if there's an issue with a specific reply
             except Exception as e:
                 print(f"Error scraping replies for {user_name}: {e}")
                 # print(f"No replies found for {user_name}")  # Debugging message
@@ -194,8 +216,10 @@ def comment(driver):
                 "comment_text": comment_text,
                 "comments_replies": comments_replies
             })
-        except:
-            continue
+            print("1:",len(comments))
+        except Exception as e:
+            print(e)
+            continue  # Skip if there's an issue with a specific comment
     return comments
 
 def num_of_comment(comments):
@@ -278,6 +302,5 @@ def save_post_data(post_data, post_link):
 if __name__ == "__main__":
     driver = initialize_webdriver()
     loging(driver)
-    post_links = ["https://www.instagram.com/parsha.mahjabeen/p/C3roBtNPXsP/"]
+    post_links = ["https://www.instagram.com/p/DInlzDqvXpl/"]
     load_post_link(driver, post_links)
-  
