@@ -74,13 +74,16 @@ def load_post_link(driver, post_links):
         )
 
         save_post_data(post_data, post_link)
-        input()
 
 def post_screenshot(driver, post_link):
     # driver.get_screenshot_as_file(f"/home/mesba/Documents/new/ss/{post_link}.png")
-    image_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "(//div[@class='_aagu _aato']//img[@class='x5yr21d xu96u03 x10l6tqk x13vifvy x87ps6o xh8yej3'])[1]")))
-    post_media_url = image_element.get_attribute("src")
-    return post_media_url
+    try:
+        image_element = WebDriverWait(driver, 10).until(EC.presence_of_element_located((By.XPATH, "(//div[@class='_aagu _aato']//img[@class='x5yr21d xu96u03 x10l6tqk x13vifvy x87ps6o xh8yej3'])[1]")))
+        post_media_url = image_element.get_attribute("src")
+        return post_media_url
+    except:
+        post_media_url = None
+        return post_media_url
     # print("post link: ",post_link)
     # parsed_url = urlparse(post_link)
     # relative_path = parsed_url.path
